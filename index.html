@@ -194,6 +194,9 @@
         }
         .icon-picker-item mark { background: #ffe680; color: inherit; padding: 0; }
         .icon-picker-empty { font-size: 0.85rem; font-style: italic; margin-top: 8px; }
+        .picker-hint { font-size: 0.75rem; opacity: 0.7; margin: 4px 0 8px; line-height: 1.3; }
+        /* Event tab: a shorter grid so the event controls stay in view */
+        .icon-picker.event-icon-picker { max-height: 34vh; }
 
         /* Rich Text Editor Styling */
         .toolbar { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 5px; background: #eee; padding: 5px; border-radius: 6px; }
@@ -645,6 +648,15 @@
             <label for="eventImageInput" style="margin-top:14px;">Event Image</label>
             <input type="file" id="eventImageInput" accept="image/*" onchange="handleEventImage(event)">
             <button type="button" id="removeEventImageBtn" onclick="clearEventImage()" style="margin-top:8px; background:#8a8a8a; font-size:0.8rem;">Remove image</button>
+
+            <div class="picker-header" style="margin-top:14px;">
+                <label for="eventIconSearch" style="margin:0;">Character Event</label>
+                <span class="picker-count" id="eventIconPickerCount" aria-live="polite"></span>
+            </div>
+            <p class="picker-hint">Pick one character: the upper half of her event art fills the icon (gold frame unchanged) and she is added as a talker with her chat icon.</p>
+            <input type="text" id="eventIconSearch" placeholder="Search characters..." aria-label="Search characters for the event icon" oninput="scheduleEventIconSearch()">
+            <div class="icon-picker event-icon-picker" id="eventIconPicker"></div>
+            <div class="icon-picker-empty" id="eventIconPickerEmpty" style="display:none;">No characters found.</div>
         </section>
 
         <section class="tab-panel" id="panel-icons" role="tabpanel" aria-labelledby="tab-icons">
@@ -767,6 +779,8 @@
         let nextMsgId = 1;                 // incrementing id: no more Date.now() collisions
         let selectedTalkerId = "narration"; // survives re-renders
         let activeIconFile = null;
+        let activeEventIconFile = null;   // character_event_icons file currently used as the event icon
+        let eventIconRequest = 0;         // ignores a slow crop when a newer character is picked
         let editingMessageId = null;
         let insertTargetId = null;
         let exporting = false;
@@ -777,6 +791,84 @@
         const SAVE_VERSION = 2;
 
         const CHARACTER_ICONS_DIR = "character_icons/";
+        // Full-character event art. Only the upper half is used for the event icon.
+        const CHARACTER_EVENT_ICONS_DIR = "character_event_icons/";
+
+        // Fallback list for the Character Event picker, used when
+        // character_event_icons/icons.json cannot be fetched.
+        let CHARACTER_EVENT_ICONS = [
+            "admire_vega.png",
+            "agnes_digital.png",
+            "agnes_tachyon.png",
+            "air_groove.png",
+            "air_shakur.png",
+            "aston_machan.png",
+            "bamboo_memory.png",
+            "biwa_hayahide.png",
+            "copano_rickey.png",
+            "curren_chan.png",
+            "daitaku_helios.png",
+            "daiwa_scarlet.png",
+            "eishin_flash.png",
+            "el_condor_pasa.png",
+            "fine_motion.png",
+            "fuji_kiseki.png",
+            "gold_ship.png",
+            "grass_wonder.png",
+            "haru_urara.png",
+            "hishi_akebono.png",
+            "hishi_amazon.png",
+            "hokko_tarumae.png",
+            "inari_one.png",
+            "ines_fujin.png",
+            "kawakami_princess.png",
+            "king_halo.png",
+            "kitasan_black.png",
+            "manhattan_cafe.png",
+            "maruzensky.png",
+            "matikanefukukitaru.png",
+            "matikanetannhauser.png",
+            "mayano_top_gun.png",
+            "meisho_doto.png",
+            "mejiro_ardan.png",
+            "mejiro_bright.png",
+            "mejiro_dober.png",
+            "mejiro_mcqueen.png",
+            "mejiro_palmer.png",
+            "mejiro_ryan.png",
+            "mihono_bourbon.png",
+            "nakayama_festa.png",
+            "narita_brian.png",
+            "narita_taishin.png",
+            "nice_nature.png",
+            "nishino_flower.png",
+            "oguri_cap.png",
+            "rice_shower.png",
+            "sakura_bakushin_o.png",
+            "sakura_chiyono_o.png",
+            "satono_diamond.png",
+            "seeking_the_pearl.png",
+            "seiun_sky.png",
+            "shinko_windy.png",
+            "silence_suzuka.png",
+            "smart_falcon.png",
+            "special_week.png",
+            "super_creek.png",
+            "sweep_tosho.png",
+            "symboli_rudolf.png",
+            "taiki_shuttle.png",
+            "tamamo_cross.png",
+            "tm_opera_o.png",
+            "tokai_teio.png",
+            "tosen_jordan.png",
+            "vodka.png",
+            "winning_ticket.png",
+            "wonder_acute.png",
+            "yaeno_muteki.png",
+            "yamanin_zephyr.png",
+            "yukino_bijin.png",
+            "zenno_rob_roy.png",
+        ];
 
         // Fallback list, used when character_icons/icons.json cannot be fetched
         // (for example when the page is opened straight from the file system).
@@ -1031,7 +1123,8 @@
         }
 
         // An empty src means "no event image at all" (no default picture)
-        function setEventImage(src) {
+        // characterFile is set only when src came from the Character Event picker.
+        function setEventImage(src, characterFile = null) {
             const img = document.getElementById("eventImagePreview");
             const placeholder = document.getElementById("eventImagePlaceholder");
             const header = document.querySelector(".event-header");
@@ -1046,6 +1139,11 @@
                 header.classList.add("no-image");
                 if (placeholder) placeholder.hidden = false;
             }
+
+            // Anything that is not an explicit Character Event choice clears the
+            // picker selection (the cropped icon is a data URL, not a file path).
+            activeEventIconFile = characterFile || null;
+            renderEventIconPicker();
             scheduleAutosave();
         }
 
@@ -1137,6 +1235,25 @@
                 console.warn("Using the built-in character icon list (icons.json unavailable).", err);
             }
             renderIconPicker();
+            renderEventIconPicker();
+        }
+
+        async function loadCharacterEventIcons() {
+            try {
+                const res = await fetch(CHARACTER_EVENT_ICONS_DIR + "icons.json", { cache: "no-cache" });
+                if (!res.ok) throw new Error("HTTP " + res.status);
+                const data = await res.json();
+                const list = Array.isArray(data) ? data : (data && data.icons);
+                if (Array.isArray(list) && list.length) {
+                    CHARACTER_EVENT_ICONS = list
+                        .filter((f) => typeof f === "string")
+                        .map((f) => f.trim())
+                        .filter(Boolean);
+                }
+            } catch (err) {
+                console.warn("Using the built-in character event icon list.", err);
+            }
+            renderEventIconPicker();
         }
 
         function highlightMatch(name, query) {
@@ -1185,6 +1302,121 @@
         }
 
         const scheduleIconSearch = debounce(() => renderIconPicker(), 150);
+
+        /* ------------------------------------------------------------------ *
+         *  Event icon picker (Character Event)
+         * ------------------------------------------------------------------ */
+        // Uses the character event art for the event image slot. Only the image
+        // source changes: .event-image keeps its square, gold-framed box.
+        function renderEventIconPicker() {
+            const container = document.getElementById("eventIconPicker");
+            if (!container) return;
+
+            const searchEl = document.getElementById("eventIconSearch");
+            const query = ((searchEl && searchEl.value) || "").trim().toLowerCase();
+            const matches = CHARACTER_EVENT_ICONS.filter((file) => {
+                if (!query) return true;
+                return file.toLowerCase().includes(query) || iconDisplayName(file).toLowerCase().includes(query);
+            });
+
+            container.innerHTML = "";
+            const fragment = document.createDocumentFragment();
+            matches.forEach((file) => {
+                const name = iconDisplayName(file);
+                const item = document.createElement("button");
+                item.type = "button";
+                item.className = "icon-picker-item" + (file === activeEventIconFile ? " selected" : "");
+                item.title = name;
+                item.setAttribute("aria-label", `Use ${name} as the event icon`);
+
+                const img = document.createElement("img");
+                img.src = CHARACTER_EVENT_ICONS_DIR + file;
+                img.alt = "";
+                img.loading = "lazy";
+
+                const label = document.createElement("span");
+                label.innerHTML = highlightMatch(name, query);
+
+                item.append(img, label);
+                item.addEventListener("click", () => applyEventCharacterIcon(file));
+                fragment.appendChild(item);
+            });
+
+            container.appendChild(fragment);
+
+            const countEl = document.getElementById("eventIconPickerCount");
+            if (countEl) countEl.textContent = matches.length + " of " + CHARACTER_EVENT_ICONS.length;
+            const emptyEl = document.getElementById("eventIconPickerEmpty");
+            if (emptyEl) emptyEl.style.display = matches.length ? "none" : "block";
+        }
+
+        const scheduleEventIconSearch = debounce(() => renderEventIconPicker(), 150);
+
+        // The event art is a full character, so keep only the upper half: a square
+        // crop centred inside the top half. The square frame is filled without
+        // squashing her, and the gold border is untouched.
+        function cropEventIconTopHalf(src) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    try {
+                        const w = img.naturalWidth || img.width;
+                        const h = img.naturalHeight || img.height;
+                        const halfHeight = Math.max(1, Math.floor(h / 2));
+                        const side = Math.min(w, halfHeight);
+                        const sx = Math.max(0, (w - side) / 2);
+                        const canvas = document.createElement("canvas");
+                        canvas.width = Math.max(1, Math.round(side));
+                        canvas.height = canvas.width;
+                        const ctx = canvas.getContext("2d");
+                        ctx.imageSmoothingQuality = "high";
+                        ctx.drawImage(img, sx, 0, side, halfHeight, 0, 0, canvas.width, canvas.height);
+                        resolve(canvas.toDataURL("image/png"));
+                    } catch (err) {
+                        // Local file:// opens taint the canvas: show the whole art instead
+                        console.warn("Could not crop the event icon; using it whole.", err);
+                        resolve(src);
+                    }
+                };
+                img.onerror = () => resolve(src);
+                img.src = src;
+            });
+        }
+
+        // Chat icons are the same character names, though a few differ in case.
+        function characterChatIcon(file) {
+            const base = file.replace(/\.[^.]+$/, "").toLowerCase();
+            const match = CHARACTER_ICONS.find((f) => f.replace(/\.[^.]+$/, "").toLowerCase() === base);
+            return CHARACTER_ICONS_DIR + (match || file);
+        }
+
+        async function applyEventCharacterIcon(file) {
+            const requestId = ++eventIconRequest;
+            const cropped = await cropEventIconTopHalf(CHARACTER_EVENT_ICONS_DIR + file);
+            if (requestId !== eventIconRequest) return; // a newer pick won
+
+            setEventImage(cropped, file);
+            document.getElementById("eventImageInput").value = "";
+
+            // Only one character can be chosen for a Character Event, so an existing
+            // Character Event talker is updated in place instead of adding another.
+            let char = characters.find((c) => c.isEventCharacter);
+            if (!char) {
+                char = { id: charCount++, isCustomImg: false };
+                characters.push(char);
+            }
+            char.name = iconDisplayName(file);
+            char.image = characterChatIcon(file);
+            char.isCustomImg = false;
+            char.isFullIcon = true;
+            char.isEventCharacter = true;
+            selectedTalkerId = String(char.id);
+
+            renderCharacterInputs();
+            updateTalkerRadios();
+            renderMessages();
+            renderEventIconPicker();
+        }
 
         // Clicking an entry adds that character as a new talker (one click = one addition).
         // Clicking a character that is already in the list selects the existing entry instead of duplicating it.
@@ -1623,6 +1855,7 @@
                 version: SAVE_VERSION,
                 eventName: document.getElementById("eventNameInput").value,
                 eventImage: document.getElementById("eventImagePreview").getAttribute("src") || "",
+                eventIconCharacter: activeEventIconFile || "",
                 charCount: charCount,
                 characters: characters,
                 messages: messages
@@ -1700,7 +1933,8 @@
                 name: typeof raw.name === "string" ? raw.name : `Talker ${index + 1}`,
                 image: image || DEFAULT_PNG,
                 isCustomImg: isCustomImg,
-                isFullIcon: isFullIcon
+                isFullIcon: isFullIcon,
+                isEventCharacter: !!raw.isEventCharacter
             };
         }
 
@@ -1720,6 +1954,14 @@
 
             const evSrc = (typeof data.eventImage === "string" && data.eventImage !== OLD_BLANK_EVENT) ? data.eventImage : "";
             setEventImage(evSrc);
+            const savedEventCharacter = typeof data.eventIconCharacter === "string" ? data.eventIconCharacter : "";
+            if (savedEventCharacter) {
+                activeEventIconFile = savedEventCharacter;
+            } else if (evSrc.startsWith(CHARACTER_EVENT_ICONS_DIR)) {
+                activeEventIconFile = evSrc.slice(CHARACTER_EVENT_ICONS_DIR.length);
+            } else {
+                activeEventIconFile = null;
+            }
 
             if (Array.isArray(data.characters)) {
                 characters = data.characters.map(normalizeCharacter);
@@ -1751,6 +1993,7 @@
             updateTalkerRadios();
             renderMessages();
             renderIconPicker();
+            renderEventIconPicker();
         }
 
         async function importJSON(event) {
@@ -1951,7 +2194,9 @@
             addCharacterField("Selection");
             updateTalkerRadios();
             renderIconPicker();
+            renderEventIconPicker();
             loadCharacterIcons();
+            loadCharacterEventIcons();
             renderMessages();
 
             const editor = editorEl();
