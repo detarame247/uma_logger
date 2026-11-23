@@ -1,6 +1,6 @@
 # UmaLogger
 
-A browser-only editor for building **Uma Musume-style chat logs**. Set the event header, pick your chatters, write the dialogue, and export the finished log as a PNG, JPG or PDF — or save it as a project file and come back to it later.
+A browser-only editor for building **Umamusume-style chat logs**. Set the event header, pick your chatters, write the dialogue, and export the finished log as a PNG, JPG or PDF — or save it as a project file and come back to it later.
 
 There is no account, no server and no build step. `index.html` is the whole application, and everything you type stays in your browser.
 
@@ -14,11 +14,12 @@ There is no account, no server and no build step. `index.html` is the whole appl
 
 ### Event header
 - Custom event title that updates the preview as you type.
-- Optional event image — upload your own, or clear it to show the empty icon slot.
-- **Character Event**: pick one character from the event-art catalogue. The **upper half** of her artwork is cropped into the event icon slot, the square gold frame stays exactly as it is, and she is automatically added to the talkers with her chat icon. Only one Character Event character can be chosen at a time: selecting a different one updates that talker in place (messages included) instead of adding another.
+- Optional event image: upload your own, or clear it to show the empty icon slot.
+- **Character Event**: pick one character from the character-event-icons list.
+- *Only character events are added currently, Career Events, Costume Events, Support Card Events, and Scenario Events will be added soon.*
 
 ### Chatters
-- **95 built-in chat icons** in a searchable picker with match highlighting. Clicking an icon adds that character as a talker; clicking someone already in the list selects them instead of duplicating them.
+- **95 built-in chat icons (only global released character are added currently)** in a searchable picker with match highlighting. Clicking an icon adds that character as a talker.
 - Rename anyone, upload a custom avatar, reset back to the default icon, or remove a talker with an undo option.
 - **+ Add Chatter** for characters that are not in the catalogue — as many as the scene needs.
 
@@ -38,16 +39,9 @@ There is no account, no server and no build step. `index.html` is the whole appl
 
 ## Quick start
 
-Download or clone this repository, then open `index.html` in a current browser.
+Access through the link: 
 
-Opening the file directly works, but serving the folder locally is recommended:
-
-```bash
-python -m http.server 8000
-# then open http://localhost:8000
-```
-
-Serving over HTTP matters for **Character Event**: browsers block reading pixels from local `file://` images, so on a direct file open the event art is shown whole instead of cropped to its upper half. Everything else works either way.
+Serving over HTTP matters for **Character Event**: browsers block reading pixels from local `file://` images. Everything else works either way.
 
 ## How to use it
 
@@ -100,7 +94,7 @@ Both `icons.json` files are convenience catalogues: if they cannot be fetched, t
 
 - Built by [@Detarame247](https://x.com/Detarame247).
 - Image rendering for exports by [html2canvas](https://html2canvas.hertzen.com/); PDF generation by [jsPDF](https://github.com/parallax/jsPDF).
-- Uma Musume Pretty Derby and its characters are © Cygames, Inc. This is an unofficial fan tool, not affiliated with or endorsed by Cygames.
+- Umamusume Pretty Derby and its characters are © Cygames, Inc. This is an unofficial fan tool, not affiliated with or endorsed by Cygames.
 
 ## License
 
