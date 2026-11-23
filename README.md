@@ -39,7 +39,7 @@ There is no account, no server and no build step. `index.html` is the whole appl
 
 ## Quick start
 
-Access through the link: 
+Access through the link: https://detarame247.github.io/uma_logger/
 
 Serving over HTTP matters for **Character Event**: browsers block reading pixels from local `file://` images. Everything else works either way.
 
