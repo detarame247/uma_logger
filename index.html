@@ -1,0 +1,1981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatlog Generator</title>
+    <!-- Libraries for Exporting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+	@font-face {
+	    font-family: 'CustomFont';
+	    src: url('47211.ttf') format('truetype');
+	    font-weight: normal;
+	    font-style: normal;
+	}
+
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap');
+
+        :root {
+            --text-color: #6d3f1a;
+            --log-bg: #f9f9f9;
+            --header-base: #7dcb0b;
+            --header-pattern: #66ba02;
+            --event-header-bg: #ff76a4;
+            --close-top: #fbfbfd;
+            --close-bottom: #e6e3ea;
+        }
+
+        body {
+            font-family: 'CustomFont', 'Nunito', sans-serif;
+            background-color: #e5e5e5;
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            align-items: flex-start;
+            font-weight: 600;
+        }
+
+        /* --- CONTROLS SECTION (LEFT PANEL) --- */
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            width: 660px;
+            max-width: 100%;
+            flex-shrink: 0;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        .controls h2 { margin-top: 0; font-size: 1.2rem; font-weight: 800; }
+        .control-group { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px dashed #eee; }
+        label { display: block; margin-bottom: 5px; font-size: 0.9rem; font-weight: 700; }
+        input[type="text"], input[type="number"], input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-family: 'CustomFont', 'Nunito', sans-serif;
+            color: var(--text-color);
+            font-weight: 700;
+        }
+
+        button {
+            background: var(--header-base);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'CustomFont', 'Nunito', sans-serif;
+            font-weight: 700;
+            transition: 0.2s;
+        }
+        button:hover { filter: brightness(1.1); }
+        button:disabled { opacity: 0.55; cursor: progress; filter: none; }
+
+        :focus-visible {
+            outline: 3px solid #2b78e4;
+            outline-offset: 2px;
+        }
+
+        /* --- COMPACT TAB BAR --- */
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            position: sticky;
+            top: -20px;
+            z-index: 5;
+            background: #fff;
+            padding: 8px 0 10px;
+            margin: -6px 0 14px;
+            border-bottom: 2px solid #eee;
+        }
+        .tab {
+            background: #f1f1f1;
+            color: var(--text-color);
+            padding: 7px 14px;
+            border-radius: 8px 8px 0 0;
+            font-size: 0.85rem;
+        }
+        .tab.active {
+            background: var(--header-base);
+            color: #fff;
+        }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* --- AUTOSAVE BANNER --- */
+        .autosave-banner {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            background: #fff8e1;
+            border: 2px solid #f0d48a;
+            border-radius: 8px;
+            padding: 8px 10px;
+            margin-bottom: 12px;
+            font-size: 0.85rem;
+        }
+        .autosave-banner[hidden] { display: none; }
+        .autosave-banner button { padding: 5px 10px; font-size: 0.8rem; }
+
+        .export-btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+        .export-status { margin-top: 8px; font-size: 0.85rem; min-height: 1.2em; }
+
+        .character-entry { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+        .character-entry input[type="text"] { flex: 1; min-width: 0; }
+        .character-entry input[type="file"] { width: 170px; }
+        .character-entry .char-remove,
+        .character-entry .char-reset {
+            flex-shrink: 0;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            font-size: 1.05rem;
+            line-height: 1;
+        }
+        .character-entry .char-remove { background: #e05a5a; }
+        .character-entry .char-reset { background: #8a8a8a; }
+
+        /* --- CHARACTER ICON PICKER --- */
+        .picker-header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+        .picker-count { font-size: 0.75rem; opacity: 0.75; }
+        .icon-picker {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+            max-height: 62vh;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .icon-picker-item {
+            background: #f7f7f7;
+            border: 2px solid #eee;
+            border-radius: 8px;
+            padding: 6px 4px 4px 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .icon-picker-item:hover { border-color: #cfcfcf; filter: none; }
+        .icon-picker-item.selected {
+            border-color: var(--header-base);
+            background: #f0f9e2;
+        }
+        .icon-picker-item img {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: contain;
+            display: block;
+            border-radius: 6px;
+        }
+        .icon-picker-item span {
+            font-size: 0.7rem;
+            font-weight: 700;
+            line-height: 1.15;
+            text-align: center;
+            word-break: break-word;
+        }
+        .icon-picker-item mark { background: #ffe680; color: inherit; padding: 0; }
+        .icon-picker-empty { font-size: 0.85rem; font-style: italic; margin-top: 8px; }
+
+        /* Rich Text Editor Styling */
+        .toolbar { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 5px; background: #eee; padding: 5px; border-radius: 6px; }
+        .toolbar button { background: white; color: var(--text-color); border: 1px solid #ccc; padding: 5px 10px; }
+        .toolbar .color-btn {
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .toolbar .color-swatch {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            padding: 0;
+            cursor: pointer;
+        }
+        .editor {
+            width: 100%;
+            height: 80px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            padding: 10px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            background: white;
+            font-size: 0.95rem;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+        .editor b, .editor strong, .editor [style*="font-weight"] {
+            font-weight: 900 !important;
+            font-size: 1.05em;
+        }
+
+        .radio-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; max-height: 160px; overflow-y: auto;}
+
+        /* --- PREVIEW SECTION (RIGHT PANEL) --- */
+        .preview-wrapper {
+            width: 500px;
+            max-width: 100%;
+            background: var(--log-bg);
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .log-header {
+            height: 50px;
+            background-color: var(--header-base);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 800;
+            z-index: 1;
+        }
+
+        .log-header::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 60%; height: 100%;
+            background-image:
+                linear-gradient(45deg, var(--header-pattern) 25%, transparent 25%, transparent 75%, var(--header-pattern) 75%, var(--header-pattern)),
+                linear-gradient(45deg, var(--header-pattern) 25%, transparent 25%, transparent 75%, var(--header-pattern) 75%, var(--header-pattern));
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+            opacity: 0.3;
+            -webkit-mask-image: linear-gradient(to right, black 20%, transparent 100%);
+            mask-image: linear-gradient(to right, black 20%, transparent 100%);
+            z-index: -1;
+        }
+
+        .white-card-wrapper {
+            background-color: #ffffff;
+            margin: 15px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            height: 500px;
+        }
+
+        .event-header {
+            background-color: var(--event-header-bg);
+            height: 42px;
+            margin: 10px 10px 0 10px;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            align-items: center;
+            position: relative;
+            padding-left: 84px; /* 10px margin + 65px icon slot + 9px gap */
+            padding-right: 15px;
+        }
+
+        .event-title-text {
+            color: #ffffff;
+            font-size: 1rem;
+            font-weight: 800;
+            z-index: 1;
+            flex: 1;
+            min-width: 0;
+            padding-right: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .event-image {
+            position: absolute;
+            left: 10px;
+            top: -6px;
+            width: 65px;
+            height: 65px;
+            /* the 2px frame is included in the 65px box, so any image size stays inside the slot */
+            box-sizing: border-box;
+            max-width: 65px;
+            max-height: 65px;
+            border-radius: 6px;
+            object-fit: contain; /* show the whole image, no cropping */
+            background: white;
+            border: 2px solid #f5d382;
+            z-index: 2;
+	    top: 70%;
+	    transform: translateY(-70%);
+        }
+        /* No event image set: an empty outline keeps the icon slot visible */
+        .event-image-placeholder {
+            position: absolute;
+            left: 10px;
+            width: 65px;
+            height: 65px;
+            border-radius: 6px;
+            border: 2px dashed rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.18);
+            box-sizing: border-box;
+            z-index: 2;
+            pointer-events: none;
+            top: 70%;
+            transform: translateY(-70%);
+        }
+        .event-image-placeholder[hidden] { display: none; }
+        .event-header.no-image {
+            /* keeps the same 75px padding-left, reserving the empty icon space */
+        }
+
+        .event-toggle-btn {
+            width: 24px;
+            height: 24px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+            border: 2px solid #5a5a5a;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            cursor: pointer;
+        }
+
+        .event-toggle-btn svg {
+            width: 14px;
+            height: 14px;
+            fill: none;
+            stroke: var(--text-color);
+            stroke-width: 3;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .chat-body {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .chat-body::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-body::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .chat-body::-webkit-scrollbar-thumb {
+            background: #d4d4d4;
+            border-radius: 10px;
+        }
+
+        .message-row {
+            display: flex;
+            gap: 10px;
+            position: relative;
+	    align-items: flex-start;
+        }
+
+        .message-avatar-container {
+            width: 75px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+	    align-items: flex-start
+        }
+
+        .message-avatar {
+            width: 75px;
+            height: 75px;
+            object-fit: cover;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .message-avatar.is-custom {
+            border-radius: 50%;
+        }
+        .message-avatar.is-default {
+            border-radius: 10px;
+        }
+        /* Full, uncropped icon (character icons already contain their own frame) */
+        .message-avatar.is-full {
+            object-fit: contain;
+            border: none;
+            box-shadow: none;
+            border-radius: 0;
+        }
+
+        .message-content {
+            display: flex;
+            flex-direction: column;
+	    justify-content: center;
+            width: 350px;
+	    flex-shrink: 0;
+        }
+
+	.message-name {
+            font-size: 1.00rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e8e8e8; /* Adds the dividing line */
+            color: var(--text-color);
+	    flex-shrink: 0; /* Prevents the name block from collapsing or shifting */
+	    justify-content: flex-start;
+        }
+
+        .message-bubble {
+            background: #ffffff;
+            border: 1px solid #e8e8e8;
+            padding: 12px 15px;
+            border-radius: 12px;
+            color: var(--text-color);
+            position: relative;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+            word-wrap: break-word;
+	    overflow-wrap: break-word;
+            font-size: 1.00rem;
+            font-weight: 700;
+            line-height: 1.4;
+	    width: 100%;
+	    box-sizing: border-box;
+	    min-height: 100px; /* Change this value to your preferred starting height */
+            display: flex;
+            flex-direction: column;
+	    justify-content: flex-start;
+        }
+
+	/* Inner text wrapper to handle vertical distribution cleanly */
+        .message-inner-text {
+	    margin: auto 0;
+        }
+
+	.message-inner-text span,
+	.message-inner-text font,
+	.message-inner-text div,
+	.message-inner-text p {
+	    display: inline !important;
+	    float: none !important;
+	    margin: 0 !important;
+	    padding: 0 !important;
+	}
+
+        .message-bubble b,
+        .message-bubble strong,
+        .message-bubble [style*="font-weight"] {
+            font-weight: 900 !important;
+            font-size: 1.05em;
+        }
+
+        .message-bubble::before {
+            content: '';
+            position: absolute;
+            top: 12px;
+            left: -5px;
+            width: 10px;
+            height: 10px;
+            background: #ffffff;
+            border-left: 1px solid #e8e8e8;
+            border-bottom: 1px solid #e8e8e8;
+            transform: rotate(45deg);
+        }
+
+        .message-row.narration {
+            margin-left: 85px;
+        }
+        .message-row.narration .message-avatar-container,
+        .message-row.narration .message-name {
+            display: none;
+        }
+        .message-row.narration .message-bubble::before {
+            display: none;
+        }
+
+        .message-actions {
+            position: absolute;
+            right: 0;
+            top: 0;
+            display: none;
+            gap: 4px;
+            background: rgba(255,255,255,0.9);
+            padding: 2px 5px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+        }
+        .message-row:hover .message-actions,
+        .message-row:focus-within .message-actions {
+            display: flex;
+        }
+        .message-actions button {
+            padding: 2px 5px;
+            font-size: 0.7rem;
+            background: #ddd;
+            color: var(--text-color);
+        }
+
+        .log-footer {
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+            background: var(--log-bg);
+            border-top: 1px solid #eaeaea;
+        }
+        .btn-close {
+            background: linear-gradient(to bottom right, var(--close-top), var(--close-bottom));
+            border: 1px solid #c9c7ce;
+            color: var(--text-color);
+            font-size: 1rem;
+            padding: 10px 40px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            font-weight: 800;
+        }
+
+        /* --- TOAST --- */
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 24px;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(38, 30, 20, 0.94);
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 10px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+            font-size: 0.9rem;
+            z-index: 50;
+            max-width: 90vw;
+        }
+        .toast[hidden] { display: none; }
+        .toast button {
+            background: #fff;
+            color: #3b2b18;
+            padding: 5px 12px;
+            font-size: 0.8rem;
+        }
+        .toast button[hidden] { display: none; }
+
+        /* --- X (TWITTER) LINK --- */
+        /* Lives outside #previewContainer and is hidden during export,
+           so it never shows up in the exported PNG / JPG / PDF. */
+        .x-link {
+            position: fixed;
+            right: 16px;
+            bottom: 16px;
+            z-index: 60;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(38, 30, 20, 0.92);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            transition: 0.2s;
+        }
+        .x-link:hover { background: #000; transform: translateY(-2px); }
+        .x-link svg { width: 20px; height: 20px; fill: currentColor; }
+
+        /* Touch / narrow screens: message actions stay reachable */
+        @media (max-width: 1100px) {
+            body { padding: 12px; }
+            .controls { width: 100%; max-height: none; }
+            .preview-wrapper { width: 100%; }
+            .message-actions {
+                display: flex;
+                opacity: 0.95;
+                position: static;
+                margin-top: 6px;
+                width: fit-content;
+                margin-left: auto;
+            }
+            .icon-picker { grid-template-columns: repeat(3, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- LEFT PANEL: CONTROLS -->
+    <div class="controls">
+        <div class="autosave-banner" id="autosaveBanner" hidden>
+            <span>Previous session found.</span>
+            <button type="button" id="restoreSessionBtn">Restore</button>
+            <button type="button" id="dismissSessionBtn" style="background:#999;">Dismiss</button>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="Editor sections">
+            <button type="button" class="tab active" role="tab" id="tab-event" data-tab="event" aria-selected="true" aria-controls="panel-event" tabindex="0">Event</button>
+            <button type="button" class="tab" role="tab" id="tab-icons" data-tab="icons" aria-selected="false" aria-controls="panel-icons" tabindex="-1">Icons</button>
+            <button type="button" class="tab" role="tab" id="tab-chars" data-tab="chars" aria-selected="false" aria-controls="panel-chars" tabindex="-1">Chatters</button>
+            <button type="button" class="tab" role="tab" id="tab-message" data-tab="message" aria-selected="false" aria-controls="panel-message" tabindex="-1">Message</button>
+            <button type="button" class="tab" role="tab" id="tab-export" data-tab="export" aria-selected="false" aria-controls="panel-export" tabindex="-1">Export</button>
+        </div>
+
+        <section class="tab-panel active" id="panel-event" role="tabpanel" aria-labelledby="tab-event">
+            <label for="eventNameInput">Event Name</label>
+            <input type="text" id="eventNameInput" value="Event name" oninput="updateEventUI()">
+
+            <label for="eventImageInput" style="margin-top:14px;">Event Image</label>
+            <input type="file" id="eventImageInput" accept="image/*" onchange="handleEventImage(event)">
+            <button type="button" id="removeEventImageBtn" onclick="clearEventImage()" style="margin-top:8px; background:#8a8a8a; font-size:0.8rem;">Remove image</button>
+        </section>
+
+        <section class="tab-panel" id="panel-icons" role="tabpanel" aria-labelledby="tab-icons">
+            <div class="picker-header">
+                <label for="iconSearch" style="margin:0;">Character Icons</label>
+                <span class="picker-count" id="iconPickerCount" aria-live="polite"></span>
+            </div>
+            <input type="text" id="iconSearch" placeholder="Search characters..." aria-label="Search characters" oninput="scheduleIconSearch()">
+            <div class="icon-picker" id="iconPicker"></div>
+            <div class="icon-picker-empty" id="iconPickerEmpty" style="display:none;">No characters found.</div>
+        </section>
+
+        <section class="tab-panel" id="panel-chars" role="tabpanel" aria-labelledby="tab-chars">
+            <div id="characterList"></div>
+            <button type="button" onclick="addCharacterField()" style="margin-top:10px; background:#444;">+ Add Chatter</button>
+        </section>
+
+        <section class="tab-panel" id="panel-message" role="tabpanel" aria-labelledby="tab-message">
+            <label id="talkerLabel">Select Talker:</label>
+            <div class="radio-group" id="talkerRadios" role="radiogroup" aria-labelledby="talkerLabel"></div>
+
+            <label style="margin-top:10px;">Message Body:</label>
+            <div class="toolbar">
+                <button type="button" onmousedown="event.preventDefault()" onclick="execFormat('bold', null)" title="Bold" aria-label="Bold"><b>B</b></button>
+                <button type="button" onmousedown="event.preventDefault()" onclick="execFormat('italic', null)" title="Italic" aria-label="Italic"><i>I</i></button>
+                <input type="color" id="textColor" onchange="execFormat('foreColor', this.value)" title="Custom Text Color" aria-label="Custom text color">
+
+                <!-- Preset Color Buttons -->
+                <button type="button" class="color-btn" style="background-color: #00bf32;" onmousedown="event.preventDefault()" onclick="execFormat('foreColor', '#00bf32')" title="Green" aria-label="Green text"></button>
+                <button type="button" class="color-btn" style="background-color: #dd688b;" onmousedown="event.preventDefault()" onclick="execFormat('foreColor', '#dd688b')" title="Pink" aria-label="Pink text"></button>
+                <button type="button" class="color-btn" style="background-color: #3a79e2;" onmousedown="event.preventDefault()" onclick="execFormat('foreColor', '#3a79e2')" title="Blue" aria-label="Blue text"></button>
+                <button type="button" class="color-btn" style="background-color: #ef6d26;" onmousedown="event.preventDefault()" onclick="execFormat('foreColor', '#ef6d26')" title="Orange" aria-label="Orange text"></button>
+
+                <!-- Text Size Dropdown -->
+                <select onmousedown="saveEditorSelection()" onchange="execFormat('fontSize', this.value)" title="Text Size" aria-label="Text size">
+                    <option value="">Size</option>
+                    <option value="1">Smallest</option>
+                    <option value="2">Small</option>
+                    <option value="3">Normal</option>
+                    <option value="4">Large</option>
+                    <option value="5">Larger</option>
+                    <option value="6">Huge</option>
+                    <option value="7">Maximum</option>
+                </select>
+
+                <!-- Font Family Dropdown -->
+                <select onmousedown="saveEditorSelection()" onchange="execFormat('fontName', this.value)" title="Font" aria-label="Font family">
+                    <option value="">Font</option>
+                    <option value="CustomFont">CustomFont</option>
+                    <option value="Nunito">Nunito</option>
+                    <option value="Arial">Arial</option>
+                    <option value="Courier New">Courier</option>
+                    <option value="Times New Roman">Times</option>
+                </select>
+            </div>
+
+            <div class="editor" id="messageEditor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Message body"></div>
+
+            <button type="button" onclick="submitMessage()" style="margin-top:10px; width: 100%;" id="submitMsgBtn">Send Message</button>
+        </section>
+
+        <section class="tab-panel" id="panel-export" role="tabpanel" aria-labelledby="tab-export">
+            <div class="export-btns">
+                <button type="button" onclick="exportToPNG()">Export PNG</button>
+                <button type="button" onclick="exportToJPG()">Export JPG</button>
+                <button type="button" onclick="exportToPDF()">Export PDF</button>
+                <button type="button" onclick="exportJSON()" style="background: #2b78e4;">Save Project</button>
+                <button type="button" onclick="document.getElementById('importFileInput').click()" style="background: #e4782b;">Load Project</button>
+                <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="importJSON(event)">
+            </div>
+            <div class="export-status" id="exportStatus" role="status" aria-live="polite"></div>
+        </section>
+    </div>
+
+    <!-- RIGHT PANEL: PREVIEW UI -->
+    <div class="preview-wrapper" id="previewContainer">
+        <div class="log-header">Log</div>
+
+        <div class="white-card-wrapper">
+            <div class="event-header no-image">
+                <div id="eventImagePlaceholder" class="event-image-placeholder" aria-hidden="true"></div>
+                <img id="eventImagePreview" class="event-image" alt="Event" style="display:none;">
+                <div class="event-title-text" id="eventTitlePreview">Event name</div>
+                <div class="event-toggle-btn">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M6 9l6 6 6-6" />
+                    </svg>
+                </div>
+            </div>
+
+            <div class="chat-body" id="chatBody"></div>
+        </div>
+
+        <div class="log-footer">
+            <button class="btn-close">Close</button>
+        </div>
+    </div>
+
+    <!-- Page-only credit link: kept outside #previewContainer (and hidden via
+         EXPORT_CSS) so it is never included in the exported logs. -->
+    <a class="x-link" href="https://x.com/Detarame247" target="_blank" rel="noopener noreferrer"
+       title="Follow @Detarame247 on X" aria-label="Open @Detarame247 on X in a new tab">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+        </svg>
+    </a>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden>
+        <span id="toastText"></span>
+        <button type="button" id="toastAction">Undo</button>
+    </div>
+
+    <script>
+        /* ------------------------------------------------------------------ *
+         *  State
+         * ------------------------------------------------------------------ */
+        let charCount = 0;
+        let characters = [];
+        let messages = [];
+        let nextMsgId = 1;                 // incrementing id: no more Date.now() collisions
+        let selectedTalkerId = "narration"; // survives re-renders
+        let activeIconFile = null;
+        let editingMessageId = null;
+        let insertTargetId = null;
+        let exporting = false;
+
+        const DEFAULT_PNG = "default.jpg";
+        const MAX_IMAGE_SIZE = 512;         // uploaded images are downscaled to this max side
+        const AUTOSAVE_KEY = "umalogger.autosave.v2";
+        const SAVE_VERSION = 2;
+
+        const CHARACTER_ICONS_DIR = "character_icons/";
+
+        // Fallback list, used when character_icons/icons.json cannot be fetched
+        // (for example when the page is opened straight from the file system).
+        let CHARACTER_ICONS = [
+            "admire_vega.png",
+            "agnes_digital.png",
+            "agnes_tachyon.png",
+            "air_groove.png",
+            "air_shakur.png",
+            "aoi_kiryuin.png",
+            "aston_machan.png",
+            "bamboo_memory.png",
+            "biko_pegasus.png",
+            "bitter_glasse.png",
+            "biwa_hayahide.png",
+            "copano_rickey.png",
+            "curren_chan.png",
+            "daiichi_ruby.png",
+            "daitaku_helios.png",
+            "daiwa_scarlet.png",
+            "eishin_flash.png",
+            "el_condor_pasa.png",
+            "etsuko_otonashi.png",
+            "fine_motion.png",
+            "fuji_kiseki.png",
+            "gold_city.png",
+            "gold_ship.png",
+            "grass_wonder.png",
+            "happy_meek.png",
+            "haru_urara.png",
+            "hishi_akebono.png",
+            "hishi_amazon.png",
+            "hokko_tarumae.png",
+            "ikuno_dictus.png",
+            "inari_one.png",
+            "ines_fujin.png",
+            "k_s_miracle.png",
+            "kawakami_princess.png",
+            "king_halo.png",
+            "kitasan_black.png",
+            "light_hello.png",
+            "little_cocon.png",
+            "manhattan_cafe.png",
+            "maruzensky.png",
+            "marvelous_sunday.png",
+            "matikanefukukitaru.png",
+            "matikanetannhauser.png",
+            "mayano_top_gun.png",
+            "meisho_doto.png",
+            "mejiro_ardan.png",
+            "mejiro_bright.png",
+            "mejiro_dober.png",
+            "mejiro_mcqueen.png",
+            "mejiro_palmer.png",
+            "mejiro_ryan.png",
+            "mihono_bourbon.png",
+            "mr_c_b.png",
+            "nakayama_festa.png",
+            "narita_brian.png",
+            "narita_taishin.png",
+            "narita_top_road.png",
+            "nice_nature.png",
+            "nishino_flower.png",
+            "oguri_cap.png",
+            "rice_shower.png",
+            "riko_kashimoto.png",
+            "sakura_bakushin_o.png",
+            "sakura_chiyono_o.png",
+            "sakura_laural.png",
+            "sasami_anshinzawa.png",
+            "satono_diamond.png",
+            "seeking_the_pearl.png",
+            "seiun_sky.png",
+            "shinko_windy.png",
+            "silence_suzuka.png",
+            "sirius_symboli.png",
+            "smart_falcon.png",
+            "special_week.png",
+            "super_creek.png",
+            "sweep_tosho.png",
+            "symboli_kris_s.png",
+            "symboli_rudolf.png",
+            "taiki_shuttle.png",
+            "tamamo_cross.png",
+            "tanino_gimlet.png",
+            "tazuna_hayakawa.png",
+            "tm_opera_o.png",
+            "tokai_teio.png",
+            "tosen_jordan.png",
+            "tsurumaru_tsuyoshi.png",
+            "twin_turbo.png",
+            "vodka.png",
+            "winning_ticket.png",
+            "wonder_Acute.png",
+            "yaeno_muteki.png",
+            "yamanin_zephyr.png",
+            "yayoi_akikawa.png",
+            "yukino_bijin.png",
+            "zenno_rob_roy.png",
+        ];
+
+        // Display names that the file-name title casing gets wrong
+        const ICON_NAME_OVERRIDES = {
+            "bitter_glasse": "Bitter Glasse",
+            "daiichi_ruby": "Daiichi Ruby",
+            "agnes_tachyon": "Agnes Tachyon",
+            "biwa_hayahide": "Biwa Hayahide",
+            "copano_rickey": "Copano Rickey",
+            "curren_chan": "Curren Chan",
+            "k_s_miracle": "K.S. Miracle",
+            "mr_c_b": "Mr. C.B.",
+            "mejiro_mcqueen": "Mejiro McQueen",
+            "tm_opera_o": "TM Opera O",
+            "wonder_acute": "Wonder Acute"
+        };
+
+        const ALLOWED_TAGS = new Set(["B", "STRONG", "I", "EM", "U", "S", "SPAN", "FONT", "BR", "DIV", "P", "SUB", "SUP", "SMALL"]);
+        const STRIPPED_TAGS = new Set(["SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED", "LINK", "META", "IMG", "SVG"]);
+        const ALLOWED_STYLE_PROPS = new Set(["color", "background-color", "font-weight", "font-style", "font-size", "font-family", "text-decoration"]);
+
+        const OLD_BLANK_EVENT = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=";
+
+        /* ------------------------------------------------------------------ *
+         *  Small helpers
+         * ------------------------------------------------------------------ */
+        function escapeHtml(value) {
+            return String(value == null ? "" : value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function escapeRegExp(value) {
+            return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        }
+
+        function safeFileName(name) {
+            return String(name || "")
+                .replace(/[\\/:*?"<>|]+/g, "-")
+                .replace(/\s+/g, " ")
+                .trim()
+                .slice(0, 80);
+        }
+
+        function debounce(fn, wait) {
+            let timer = null;
+            return (...args) => {
+                clearTimeout(timer);
+                timer = setTimeout(() => fn(...args), wait);
+            };
+        }
+
+        function downloadURL(url, filename) {
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+
+        /* ------------------------------------------------------------------ *
+         *  HTML sanitising + paste handling
+         * ------------------------------------------------------------------ */
+        function sanitizeHTML(html) {
+            const doc = new DOMParser().parseFromString(`<div id="sanitize-root">${html || ""}</div>`, "text/html");
+            const root = doc.getElementById("sanitize-root");
+            if (!root) return "";
+
+            const walk = (node) => {
+                Array.from(node.childNodes).forEach((child) => {
+                    if (child.nodeType === Node.TEXT_NODE) return;
+                    if (child.nodeType !== Node.ELEMENT_NODE) { child.remove(); return; }
+
+                    const tag = child.tagName;
+
+                    if (STRIPPED_TAGS.has(tag)) { child.remove(); return; }
+
+                    if (!ALLOWED_TAGS.has(tag)) {
+                        // Unknown element: keep its content, drop the wrapper
+                        walk(child);
+                        while (child.firstChild) node.insertBefore(child.firstChild, child);
+                        node.removeChild(child);
+                        return;
+                    }
+
+                    walk(child);
+
+                    Array.from(child.attributes).forEach((attr) => {
+                        const attrName = attr.name.toLowerCase();
+                        if (attrName === "style") {
+                            const kept = attr.value
+                                .split(";")
+                                .map((decl) => decl.trim())
+                                .filter(Boolean)
+                                .filter((decl) => ALLOWED_STYLE_PROPS.has(decl.split(":")[0].trim().toLowerCase()))
+                                .join("; ");
+                            if (kept) child.setAttribute("style", kept);
+                            else child.removeAttribute("style");
+                            return;
+                        }
+                        if (attrName === "color" || attrName === "face" || attrName === "size") return;
+                        child.removeAttribute(attr.name);
+                    });
+                });
+            };
+
+            walk(root);
+            return root.innerHTML;
+        }
+
+        /* ------------------------------------------------------------------ *
+         *  Editor commands (keep the caret when using the toolbar)
+         * ------------------------------------------------------------------ */
+        let savedSelection = null;
+
+        function editorEl() {
+            return document.getElementById("messageEditor");
+        }
+
+        function saveEditorSelection() {
+            const editor = editorEl();
+            const sel = window.getSelection();
+            if (!sel || !sel.rangeCount) return;
+            const range = sel.getRangeAt(0);
+            if (editor.contains(range.commonAncestorContainer)) savedSelection = range.cloneRange();
+        }
+
+        function restoreEditorSelection() {
+            const editor = editorEl();
+            editor.focus();
+            if (!savedSelection) return;
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(savedSelection);
+        }
+
+        function execFormat(command, value) {
+            restoreEditorSelection();
+            document.execCommand(command, false, value);
+            saveEditorSelection();
+        }
+
+        /* ------------------------------------------------------------------ *
+         *  Event header
+         * ------------------------------------------------------------------ */
+        function updateEventUI() {
+            document.getElementById("eventTitlePreview").innerText = document.getElementById("eventNameInput").value;
+            scheduleAutosave();
+        }
+
+        // An empty src means "no event image at all" (no default picture)
+        function setEventImage(src) {
+            const img = document.getElementById("eventImagePreview");
+            const placeholder = document.getElementById("eventImagePlaceholder");
+            const header = document.querySelector(".event-header");
+            if (src) {
+                img.src = src;
+                img.style.display = "";
+                header.classList.remove("no-image");
+                if (placeholder) placeholder.hidden = true;
+            } else {
+                img.removeAttribute("src");
+                img.style.display = "none";
+                header.classList.add("no-image");
+                if (placeholder) placeholder.hidden = false;
+            }
+            scheduleAutosave();
+        }
+
+        async function handleEventImage(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            try {
+                setEventImage(await readImageFile(file));
+            } catch (err) {
+                console.error(err);
+                alert("That image could not be read.");
+            }
+        }
+
+        function clearEventImage() {
+            setEventImage("");
+            document.getElementById("eventImageInput").value = "";
+        }
+
+        // Read an uploaded image, downscaling it so save files stay small
+        function readImageFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onerror = () => reject(reader.error || new Error("Read error"));
+                reader.onload = () => {
+                    const img = new Image();
+                    img.onerror = () => reject(new Error("Unreadable image"));
+                    img.onload = () => {
+                        const longest = Math.max(img.naturalWidth, img.naturalHeight);
+                        const scale = Math.min(1, MAX_IMAGE_SIZE / longest);
+                        if (scale === 1 && file.size <= 200 * 1024) {
+                            resolve(reader.result);
+                            return;
+                        }
+                        const canvas = document.createElement("canvas");
+                        canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+                        canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+                        const ctx = canvas.getContext("2d");
+                        ctx.imageSmoothingQuality = "high";
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        const type = file.type === "image/png" ? "image/png" : "image/jpeg";
+                        resolve(canvas.toDataURL(type, 0.92));
+                    };
+                    img.src = reader.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        /* ------------------------------------------------------------------ *
+         *  Character icon picker
+         * ------------------------------------------------------------------ */
+        function iconDisplayName(file) {
+            const base = file.replace(/\.[^.]+$/, "");
+            const override = ICON_NAME_OVERRIDES[base.toLowerCase()];
+            if (override) return override;
+            return base
+                .split("_")
+                .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(" ");
+        }
+
+        // "Selection" first (with its default icon), then every character icon
+        function iconPresets() {
+            return [
+                { key: "__selection__", name: "Selection", image: DEFAULT_PNG, fullIcon: false, file: "" }
+            ].concat(CHARACTER_ICONS.map((file) => ({
+                key: file,
+                name: iconDisplayName(file),
+                image: CHARACTER_ICONS_DIR + file,
+                fullIcon: true,
+                file: file
+            })));
+        }
+
+        async function loadCharacterIcons() {
+            try {
+                const res = await fetch(CHARACTER_ICONS_DIR + "icons.json", { cache: "no-cache" });
+                if (!res.ok) throw new Error("HTTP " + res.status);
+                const data = await res.json();
+                const list = Array.isArray(data) ? data : (data && data.icons);
+                if (Array.isArray(list) && list.length) {
+                    CHARACTER_ICONS = list
+                        .filter((f) => typeof f === "string")
+                        .map((f) => f.trim())
+                        .filter(Boolean);
+                }
+            } catch (err) {
+                console.warn("Using the built-in character icon list (icons.json unavailable).", err);
+            }
+            renderIconPicker();
+        }
+
+        function highlightMatch(name, query) {
+            const safe = escapeHtml(name);
+            if (!query) return safe;
+            const regex = new RegExp("(" + escapeRegExp(escapeHtml(query)) + ")", "i");
+            return safe.replace(regex, "<mark>$1</mark>");
+        }
+
+        function renderIconPicker() {
+            const container = document.getElementById("iconPicker");
+            const countEl = document.getElementById("iconPickerCount");
+            const query = (document.getElementById("iconSearch").value || "").trim().toLowerCase();
+            container.innerHTML = "";
+
+            const presets = iconPresets();
+            const matches = presets.filter((preset) => {
+                if (!query) return true;
+                return preset.name.toLowerCase().includes(query) || preset.file.toLowerCase().includes(query);
+            });
+
+            const fragment = document.createDocumentFragment();
+            matches.forEach((preset) => {
+                const item = document.createElement("button");
+                item.type = "button";
+                item.className = "icon-picker-item" + (preset.key === activeIconFile ? " selected" : "");
+                item.title = preset.name;
+                item.setAttribute("aria-label", preset.name);
+
+                const img = document.createElement("img");
+                img.src = preset.image;
+                img.alt = "";
+                img.loading = "lazy";
+
+                const label = document.createElement("span");
+                label.innerHTML = highlightMatch(preset.name, query);
+
+                item.append(img, label);
+                item.addEventListener("click", () => applyCharacterPreset(preset));
+                fragment.appendChild(item);
+            });
+
+            container.appendChild(fragment);
+            countEl.textContent = matches.length + " of " + presets.length;
+            document.getElementById("iconPickerEmpty").style.display = matches.length ? "none" : "block";
+        }
+
+        const scheduleIconSearch = debounce(() => renderIconPicker(), 150);
+
+        // Clicking an entry adds that character as a new talker (one click = one addition).
+        // Clicking a character that is already in the list selects the existing entry instead of duplicating it.
+        function applyCharacterPreset(preset) {
+            const name = preset.name;
+
+            let char = characters.find((c) => (c.name || "").trim().toLowerCase() === name.toLowerCase());
+
+            if (!char) {
+                char = { id: charCount++, isCustomImg: false };
+                characters.push(char);
+            }
+
+            char.name = name;
+            char.image = preset.image;
+            char.isCustomImg = false;
+            char.isFullIcon = !!preset.fullIcon;
+            activeIconFile = preset.key;
+            selectedTalkerId = String(char.id);
+
+            renderCharacterInputs();
+            updateTalkerRadios();
+            renderIconPicker();
+            renderMessages();
+        }
+
+        /* ------------------------------------------------------------------ *
+         *  Characters
+         * ------------------------------------------------------------------ */
+        function addCharacterField(defaultName = "", defaultImage = null) {
+            const id = charCount++;
+            characters.push({
+                id: id,
+                name: defaultName || `Talker ${id + 1}`,
+                image: defaultImage || DEFAULT_PNG,
+                isCustomImg: false,
+                isFullIcon: !!defaultImage
+            });
+
+            renderCharacterInputs();
+            updateTalkerRadios();
+            scheduleAutosave();
+        }
+
+        function renderCharacterInputs() {
+            const container = document.getElementById("characterList");
+            container.innerHTML = "";
+            const fragment = document.createDocumentFragment();
+
+            characters.forEach((char) => {
+                const row = document.createElement("div");
+                row.className = "character-entry";
+
+                const nameInput = document.createElement("input");
+                nameInput.type = "text";
+                nameInput.value = char.name;
+                nameInput.placeholder = "Name";
+                nameInput.setAttribute("aria-label", "Character name");
+                nameInput.addEventListener("input", (e) => updateCharName(char.id, e.target.value));
+
+                const fileInput = document.createElement("input");
+                fileInput.type = "file";
+                fileInput.accept = "image/*";
+                fileInput.setAttribute("aria-label", `Image for ${char.name}`);
+                fileInput.addEventListener("change", (e) => updateCharImage(char.id, e.target));
+
+                const resetBtn = document.createElement("button");
+                resetBtn.type = "button";
+                resetBtn.className = "char-reset";
+                resetBtn.textContent = "↺";
+                resetBtn.title = "Reset to default icon";
+                resetBtn.setAttribute("aria-label", `Reset ${char.name} to the default icon`);
+                resetBtn.addEventListener("click", () => resetCharImage(char.id));
+
+                const removeBtn = document.createElement("button");
+                removeBtn.type = "button";
+                removeBtn.className = "char-remove";
+                removeBtn.textContent = "×";
+                removeBtn.title = "Remove this talker";
+                removeBtn.setAttribute("aria-label", `Remove ${char.name}`);
+                removeBtn.addEventListener("click", () => removeCharacter(char.id));
+
+                row.append(nameInput, fileInput, resetBtn, removeBtn);
+                fragment.appendChild(row);
+            });
+
+            container.appendChild(fragment);
+        }
+
+        function removeCharacter(id) {
+            const index = characters.findIndex((c) => String(c.id) === String(id));
+            if (index < 0) return;
+
+            const char = characters[index];
+            const removedMessages = messages
+                .map((m, i) => ({ m, i }))
+                .filter(({ m }) => String(m.talkerId) === String(id));
+
+            characters.splice(index, 1);
+            messages = messages.filter((m) => String(m.talkerId) !== String(id));
+            if (String(selectedTalkerId) === String(id)) selectedTalkerId = "narration";
+
+            cancelComposeState();
+            renderCharacterInputs();
+            updateTalkerRadios();
+            renderMessages();
+
+            const detail = removedMessages.length ? ` and ${removedMessages.length} message(s)` : "";
+            showToast(`Removed "${char.name}"${detail}`, () => {
+                characters.splice(Math.min(index, characters.length), 0, char);
+                removedMessages
+                    .slice()
+                    .sort((a, b) => a.i - b.i)
+                    .forEach(({ m, i }) => messages.splice(Math.min(i, messages.length), 0, m));
+                renderCharacterInputs();
+                updateTalkerRadios();
+                renderMessages();
+                showToast(`Restored "${char.name}"`);
+            });
+        }
+
+        function updateCharName(id, newName) {
+            const char = characters.find((c) => String(c.id) === String(id));
+            if (!char) return;
+            char.name = newName;
+
+            // Keep the talker selection and just refresh the label instead of rebuilding the list
+            const label = document.querySelector(`#talkerRadios label[data-char-id="${id}"] span`);
+            if (label) label.textContent = newName;
+
+            renderMessages();
+            scheduleAutosave();
+        }
+
+        async function updateCharImage(id, inputElement) {
+            const file = inputElement.files && inputElement.files[0];
+            const char = characters.find((c) => String(c.id) === String(id));
+            if (!file || !char) return;
+            try {
+                char.image = await readImageFile(file);
+                char.isCustomImg = true;
+                char.isFullIcon = false;
+                renderMessages();
+                scheduleAutosave();
+            } catch (err) {
+                console.error(err);
+                alert("That image could not be read.");
+            }
+        }
+
+        function resetCharImage(id) {
+            const char = characters.find((c) => String(c.id) === String(id));
+            if (!char) return;
+            char.image = DEFAULT_PNG;
+            char.isCustomImg = false;
+            char.isFullIcon = false;
+            renderCharacterInputs();
+            renderMessages();
+            scheduleAutosave();
+        }
+
+        function updateTalkerRadios() {
+            const container = document.getElementById("talkerRadios");
+            container.innerHTML = "";
+
+            // Keep the selection valid if the talker disappeared
+            if (selectedTalkerId !== "narration" && !characters.some((c) => String(c.id) === String(selectedTalkerId))) {
+                selectedTalkerId = "narration";
+            }
+
+            const narrationLabel = document.createElement("label");
+            const narrationRadio = document.createElement("input");
+            narrationRadio.type = "radio";
+            narrationRadio.name = "talker";
+            narrationRadio.value = "narration";
+            narrationRadio.checked = selectedTalkerId === "narration";
+            narrationRadio.addEventListener("change", () => {
+                if (narrationRadio.checked) selectedTalkerId = "narration";
+            });
+            const narrationText = document.createElement("i");
+            narrationText.textContent = "[Narration - No Image/Name]";
+            narrationLabel.append(narrationRadio, narrationText);
+            container.appendChild(narrationLabel);
+
+            characters.forEach((char) => {
+                const label = document.createElement("label");
+                label.dataset.charId = char.id;
+
+                const radio = document.createElement("input");
+                radio.type = "radio";
+                radio.name = "talker";
+                radio.value = char.id;
+                radio.checked = String(selectedTalkerId) === String(char.id);
+                radio.addEventListener("change", () => {
+                    if (radio.checked) selectedTalkerId = String(char.id);
+                });
+
+                const text = document.createElement("span");
+                text.textContent = char.name;
+
+                label.append(radio, text);
+                container.appendChild(label);
+            });
+        }
+
+        /* ------------------------------------------------------------------ *
+         *  Messages
+         * ------------------------------------------------------------------ */
+        function cancelComposeState() {
+            editingMessageId = null;
+            insertTargetId = null;
+            document.getElementById("submitMsgBtn").innerText = "Send Message";
+        }
+
+        function submitMessage() {
+            const editor = editorEl();
+            const htmlContent = sanitizeHTML(editor.innerHTML).trim();
+            if (!htmlContent) return;
+
+            if (editingMessageId !== null) {
+                const msg = messages.find((m) => m.id === editingMessageId);
+                if (msg) {
+                    msg.content = htmlContent;
+                    msg.talkerId = selectedTalkerId;
+                }
+                cancelComposeState();
+            } else if (insertTargetId !== null) {
+                const index = messages.findIndex((m) => m.id === insertTargetId);
+                const newMessage = { id: nextMsgId++, talkerId: selectedTalkerId, content: htmlContent };
+                if (index !== -1) messages.splice(index, 0, newMessage);
+                else messages.push(newMessage);
+                cancelComposeState();
+            } else {
+                messages.push({ id: nextMsgId++, talkerId: selectedTalkerId, content: htmlContent });
+            }
+
+            editor.innerHTML = "";
+            renderMessages();
+        }
+
+        function deleteMessage(id) {
+            messages = messages.filter((m) => m.id !== id);
+            renderMessages();
+        }
+
+        function editMessage(id) {
+            const msg = messages.find((m) => m.id === id);
+            if (!msg) return;
+
+            editorEl().innerHTML = sanitizeHTML(msg.content);
+            selectedTalkerId = String(msg.talkerId);
+            updateTalkerRadios();
+
+            editingMessageId = id;
+            insertTargetId = null;
+            document.getElementById("submitMsgBtn").innerText = "Update Message";
+            selectTab("message");
+            editorEl().focus();
+        }
+
+        function prepareInsert(id) {
+            insertTargetId = id;
+            editingMessageId = null;
+
+            selectTab("message");
+            editorEl().focus();
+            document.getElementById("submitMsgBtn").innerText = "Insert Message Here";
+        }
+
+        function moveMessage(id, delta) {
+            const i = messages.findIndex((m) => m.id === id);
+            const j = i + delta;
+            if (i < 0 || j < 0 || j >= messages.length) return;
+            const temp = messages[i];
+            messages[i] = messages[j];
+            messages[j] = temp;
+            renderMessages();
+        }
+
+        function duplicateMessage(id) {
+            const i = messages.findIndex((m) => m.id === id);
+            if (i < 0) return;
+            messages.splice(i + 1, 0, { id: nextMsgId++, talkerId: messages[i].talkerId, content: messages[i].content });
+            renderMessages();
+        }
+
+        function buildMessageActions(msg) {
+            const actions = document.createElement("div");
+            actions.className = "message-actions";
+
+            const add = (label, title, handler, styles) => {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.textContent = label;
+                btn.title = title;
+                btn.setAttribute("aria-label", title);
+                if (styles) btn.style.cssText = styles;
+                btn.addEventListener("click", handler);
+                actions.appendChild(btn);
+            };
+
+            add("↑", "Move message up", () => moveMessage(msg.id, -1));
+            add("↓", "Move message down", () => moveMessage(msg.id, 1));
+            add("Edit", "Edit this message", () => editMessage(msg.id));
+            add("Insert", "Insert a message above this one", () => prepareInsert(msg.id), "background:#2b78e4;color:white;");
+            add("Copy", "Duplicate this message", () => duplicateMessage(msg.id));
+            add("Del", "Delete this message", () => deleteMessage(msg.id));
+            return actions;
+        }
+
+        function renderMessages() {
+            const container = document.getElementById("chatBody");
+            const fragment = document.createDocumentFragment();
+
+            messages.forEach((msg) => {
+                const isNarration = msg.talkerId === "narration";
+                const char = isNarration ? null : characters.find((c) => String(c.id) === String(msg.talkerId));
+                if (!isNarration && !char) return;
+
+                const row = document.createElement("div");
+                row.className = "message-row";
+                if (isNarration) row.classList.add("narration");
+
+                if (!isNarration) {
+                    const avatarWrap = document.createElement("div");
+                    avatarWrap.className = "message-avatar-container";
+                    const avatar = document.createElement("img");
+                    avatar.className = "message-avatar " + (char.isCustomImg ? "is-custom" : (char.isFullIcon ? "is-full" : "is-default"));
+                    avatar.src = char.image;
+                    avatar.alt = char.name;
+                    avatarWrap.appendChild(avatar);
+                    row.appendChild(avatarWrap);
+                }
+
+                const content = document.createElement("div");
+                content.className = "message-content";
+                if (isNarration) content.style.maxWidth = "100%";
+
+                const bubble = document.createElement("div");
+                bubble.className = "message-bubble";
+
+                if (!isNarration) {
+                    const nameEl = document.createElement("div");
+                    nameEl.className = "message-name";
+                    nameEl.textContent = char.name;
+                    bubble.appendChild(nameEl);
+                }
+
+                const inner = document.createElement("div");
+                inner.className = "message-inner-text";
+                inner.innerHTML = sanitizeHTML(msg.content || "");
+                bubble.appendChild(inner);
+
+                content.appendChild(bubble);
+                row.appendChild(content);
+                row.appendChild(buildMessageActions(msg));
+                fragment.appendChild(row);
+            });
+
+            container.innerHTML = "";
+            container.appendChild(fragment);
+            container.scrollTop = container.scrollHeight;
+            scheduleAutosave();
+        }
+
+        /* ------------------------------------------------------------------ *
+         *  Tabs
+         * ------------------------------------------------------------------ */
+        function selectTab(name) {
+            document.querySelectorAll(".tab").forEach((tab) => {
+                const on = tab.dataset.tab === name;
+                tab.classList.toggle("active", on);
+                tab.setAttribute("aria-selected", on ? "true" : "false");
+                tab.tabIndex = on ? 0 : -1;
+            });
+            document.querySelectorAll(".tab-panel").forEach((panel) => {
+                panel.classList.toggle("active", panel.id === "panel-" + name);
+            });
+        }
+
+        function initTabs() {
+            const tabs = Array.from(document.querySelectorAll(".tab"));
+            tabs.forEach((tab) => {
+                tab.addEventListener("click", () => selectTab(tab.dataset.tab));
+                tab.addEventListener("keydown", (e) => {
+                    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+                    e.preventDefault();
+                    const i = tabs.indexOf(tab);
+                    const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+                    next.focus();
+                    selectTab(next.dataset.tab);
+                });
+            });
+        }
+
+        /* ------------------------------------------------------------------ *
+         *  Toast (undo)
+         * ------------------------------------------------------------------ */
+        let toastTimer = null;
+        let toastUndo = null;
+
+        function showToast(text, undoFn) {
+            const toast = document.getElementById("toast");
+            document.getElementById("toastText").textContent = text;
+            const action = document.getElementById("toastAction");
+            toastUndo = undoFn || null;
+            action.hidden = !undoFn;
+            toast.hidden = false;
+
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(hideToast, 10000);
+        }
+
+        function hideToast() {
+            clearTimeout(toastTimer);
+            document.getElementById("toast").hidden = true;
+            toastUndo = null;
+        }
+
+        function initToast() {
+            document.getElementById("toastAction").addEventListener("click", () => {
+                const fn = toastUndo;
+                hideToast();
+                if (fn) fn();
+            });
+        }
+
+        /* ------------------------------------------------------------------ *
+         *  Autosave
+         * ------------------------------------------------------------------ */
+        let autosaveTimer = null;
+        let autosaveEnabled = false;
+
+        function currentState() {
+            return {
+                version: SAVE_VERSION,
+                eventName: document.getElementById("eventNameInput").value,
+                eventImage: document.getElementById("eventImagePreview").getAttribute("src") || "",
+                charCount: charCount,
+                characters: characters,
+                messages: messages
+            };
+        }
+
+        function scheduleAutosave() {
+            if (!autosaveEnabled) return;
+            clearTimeout(autosaveTimer);
+            autosaveTimer = setTimeout(() => {
+                try {
+                    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(currentState()));
+                } catch (err) {
+                    // Storage full or unavailable: autosave is best-effort only
+                }
+            }, 400);
+        }
+
+        function readAutosave() {
+            try {
+                const raw = localStorage.getItem(AUTOSAVE_KEY);
+                if (!raw) return null;
+                const data = JSON.parse(raw);
+                if (!data || !Array.isArray(data.characters) || !Array.isArray(data.messages)) return null;
+                const hasContent = data.messages.length > 0 || data.characters.length > 1;
+                return hasContent ? data : null;
+            } catch (err) {
+                return null;
+            }
+        }
+
+        function initAutosaveBanner() {
+            const banner = document.getElementById("autosaveBanner");
+            const pending = readAutosave();
+
+            if (!pending) {
+                autosaveEnabled = true;
+                scheduleAutosave();
+                return;
+            }
+
+            banner.hidden = false;
+
+            document.getElementById("restoreSessionBtn").addEventListener("click", () => {
+                autosaveEnabled = true;
+                loadProjectData(pending);
+                banner.hidden = true;
+                scheduleAutosave();
+            });
+
+            document.getElementById("dismissSessionBtn").addEventListener("click", () => {
+                autosaveEnabled = true;
+                banner.hidden = true;
+                scheduleAutosave();
+            });
+        }
+
+        /* ------------------------------------------------------------------ *
+         *  Project load / save
+         * ------------------------------------------------------------------ */
+        function normalizeCharacter(raw, index) {
+            const id = Number.isFinite(Number(raw.id)) ? Number(raw.id) : index;
+            let image = typeof raw.image === "string" ? raw.image : DEFAULT_PNG;
+            let isCustomImg = !!raw.isCustomImg;
+            let isFullIcon = !!raw.isFullIcon;
+
+            // Saves made before the default images were removed
+            if (!isCustomImg && /(MsgIcon|EventIcon)\.png$/i.test(image)) {
+                image = DEFAULT_PNG;
+                isFullIcon = false;
+            }
+
+            return {
+                id: id,
+                name: typeof raw.name === "string" ? raw.name : `Talker ${index + 1}`,
+                image: image || DEFAULT_PNG,
+                isCustomImg: isCustomImg,
+                isFullIcon: isFullIcon
+            };
+        }
+
+        function normalizeMessage(raw) {
+            return {
+                id: Number.isFinite(Number(raw.id)) ? Number(raw.id) : 0,
+                talkerId: raw.talkerId == null ? "narration" : raw.talkerId,
+                content: sanitizeHTML(typeof raw.content === "string" ? raw.content : "")
+            };
+        }
+
+        function loadProjectData(data) {
+            if (typeof data.eventName === "string") {
+                document.getElementById("eventNameInput").value = data.eventName;
+                updateEventUI();
+            }
+
+            const evSrc = (typeof data.eventImage === "string" && data.eventImage !== OLD_BLANK_EVENT) ? data.eventImage : "";
+            setEventImage(evSrc);
+
+            if (Array.isArray(data.characters)) {
+                characters = data.characters.map(normalizeCharacter);
+            }
+
+            const seenIds = new Set();
+            if (Array.isArray(data.messages)) {
+                messages = data.messages.map(normalizeMessage).map((msg) => {
+                    // Old saves could contain duplicate ids: clear them for renumbering
+                    if (!msg.id || seenIds.has(msg.id)) msg.id = 0;
+                    seenIds.add(msg.id);
+                    return msg;
+                });
+            }
+
+            const maxCharId = characters.reduce((max, c) => Math.max(max, Number(c.id) || 0), -1);
+            const declaredCount = typeof data.charCount === "number" ? data.charCount : 0;
+            charCount = Math.max(declaredCount, maxCharId + 1, characters.length);
+
+            nextMsgId = messages.reduce((max, m) => Math.max(max, Number(m.id) || 0), 0) + 1;
+            messages.forEach((msg) => { if (!msg.id) msg.id = nextMsgId++; });
+
+            selectedTalkerId = "narration";
+            activeIconFile = null;
+            cancelComposeState();
+            editorEl().innerHTML = "";
+
+            renderCharacterInputs();
+            updateTalkerRadios();
+            renderMessages();
+            renderIconPicker();
+        }
+
+        async function importJSON(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                loadProjectData(data);
+                autosaveEnabled = true;
+                scheduleAutosave();
+                alert("Project loaded successfully!");
+            } catch (err) {
+                console.error(err);
+                alert("Invalid JSON save file.");
+            } finally {
+                event.target.value = "";
+            }
+        }
+
+        /* ------------------------------------------------------------------ *
+         *  Saving (choose where the file goes)
+         * ------------------------------------------------------------------ */
+        function exportBaseName() {
+            return safeFileName(document.getElementById("eventNameInput").value) || "ChatLog";
+        }
+
+        function canvasToBlob(canvas, type, quality) {
+            return new Promise((resolve, reject) => {
+                canvas.toBlob((blob) => {
+                    if (blob) resolve(blob);
+                    else reject(new Error("The preview could not be encoded"));
+                }, type, quality);
+            });
+        }
+
+        // Ask the user where the file goes. If the save picker is unavailable this
+        // falls back to a download, and the desktop build then opens its own save
+        // dialog, so the destination is always chosen by the user.
+        async function saveFile(blob, suggestedName, types) {
+            if (typeof window.showSaveFilePicker === "function") {
+                try {
+                    const handle = await window.showSaveFilePicker({ suggestedName: suggestedName, types: types });
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    return true;
+                } catch (err) {
+                    if (err && err.name === "AbortError") return false; // cancelled on purpose
+                    console.warn("Save picker unavailable, using a download instead.", err);
+                }
+            }
+
+            const url = URL.createObjectURL(blob);
+            downloadURL(url, suggestedName);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            return true;
+        }
+
+        function exportJSON() {
+            const blob = new Blob([JSON.stringify(currentState(), null, 2)], { type: "application/json" });
+            return saveFile(blob, `${exportBaseName()}_save.json`, [
+                { description: "Project file", accept: { "application/json": [".json"] } }
+            ]);
+        }
+
+        /* ------------------------------------------------------------------ *
+         *  Export (PNG / JPG / PDF)
+         * ------------------------------------------------------------------ */
+        const EXPORT_CSS = `
+            .message-actions { display: none !important; }
+            .white-card-wrapper { height: auto !important; flex: none !important; }
+            .chat-body { overflow: visible !important; }
+            .x-link { display: none !important; }
+        `;
+
+        function prepareFittedImages(scale) {
+            const imgs = document.querySelectorAll("#previewContainer img.message-avatar, #previewContainer img.event-image");
+            return Array.from(imgs).map((img) => {
+                if (!img.naturalWidth || !img.clientWidth) return null;
+                const W = img.clientWidth, H = img.clientHeight;
+                const fit = getComputedStyle(img).objectFit;
+                const k = fit === "cover"
+                    ? Math.max(W / img.naturalWidth, H / img.naturalHeight)
+                    : Math.min(W / img.naturalWidth, H / img.naturalHeight);
+                const dw = img.naturalWidth * k, dh = img.naturalHeight * k;
+
+                const canvas = document.createElement("canvas");
+                canvas.width = Math.round(W * scale);
+                canvas.height = Math.round(H * scale);
+                const ctx = canvas.getContext("2d");
+                ctx.imageSmoothingQuality = "high";
+                ctx.drawImage(img, (W - dw) / 2 * scale, (H - dh) / 2 * scale, dw * scale, dh * scale);
+                try { return canvas.toDataURL("image/png"); } catch (err) { return null; }
+            });
+        }
+
+        function applyFittedImages(clonedDoc, fitted) {
+            clonedDoc.querySelectorAll("#previewContainer img.message-avatar, #previewContainer img.event-image")
+                .forEach((img, i) => {
+                    if (!fitted[i]) return;
+                    const fresh = clonedDoc.createElement("img");
+                    fresh.className = img.className;
+                    fresh.style.cssText = img.style.cssText;
+                    fresh.src = fitted[i];
+                    img.replaceWith(fresh);
+                });
+        }
+
+        async function renderPreviewCanvas() {
+            const container = document.getElementById("previewContainer");
+            const style = document.createElement("style");
+            style.textContent = EXPORT_CSS;
+            document.head.appendChild(style);
+            try {
+                const SCALE = 2;
+                const fitted = prepareFittedImages(SCALE);
+                return await html2canvas(container, {
+                    scale: SCALE,
+                    useCORS: true,
+                    backgroundColor: "#f9f9f9",
+                    onclone: (doc) => applyFittedImages(doc, fitted)
+                });
+            } finally {
+                document.head.removeChild(style);
+            }
+        }
+
+        async function withExportBusy(label, task) {
+            if (exporting) return;
+            exporting = true;
+
+            const buttons = Array.from(document.querySelectorAll(".export-btns button"));
+            const originalLabels = buttons.map((b) => b.textContent);
+            buttons.forEach((b) => { b.disabled = true; });
+            const status = document.getElementById("exportStatus");
+            status.textContent = label;
+
+            try {
+                await task();
+            } catch (err) {
+                console.error(err);
+                alert("Export failed. Please try again.");
+            } finally {
+                exporting = false;
+                buttons.forEach((b, i) => { b.disabled = false; b.textContent = originalLabels[i]; });
+                status.textContent = "";
+            }
+        }
+
+        function exportToPNG() {
+            return withExportBusy("Rendering PNG…", async () => {
+                const canvas = await renderPreviewCanvas();
+                const blob = await canvasToBlob(canvas, "image/png");
+                await saveFile(blob, `${exportBaseName()}.png`, [
+                    { description: "PNG image", accept: { "image/png": [".png"] } }
+                ]);
+            });
+        }
+
+        function exportToJPG() {
+            return withExportBusy("Rendering JPG…", async () => {
+                const canvas = await renderPreviewCanvas();
+                const blob = await canvasToBlob(canvas, "image/jpeg", 0.95);
+                await saveFile(blob, `${exportBaseName()}.jpg`, [
+                    { description: "JPEG image", accept: { "image/jpeg": [".jpg", ".jpeg"] } }
+                ]);
+            });
+        }
+
+        function exportToPDF() {
+            return withExportBusy("Rendering PDF…", async () => {
+                const { jsPDF } = window.jspdf;
+                const canvas = await renderPreviewCanvas();
+                const imgData = canvas.toDataURL("image/png", 1.0);
+                const pdf = new jsPDF({
+                    orientation: "portrait",
+                    unit: "px",
+                    format: [canvas.width / 2, canvas.height / 2]
+                });
+                pdf.addImage(imgData, "PNG", 0, 0, canvas.width / 2, canvas.height / 2);
+                const blob = pdf.output("blob");
+                await saveFile(blob, `${exportBaseName()}.pdf`, [
+                    { description: "PDF document", accept: { "application/pdf": [".pdf"] } }
+                ]);
+            });
+        }
+
+        /* ------------------------------------------------------------------ *
+         *  Init
+         * ------------------------------------------------------------------ */
+        function init() {
+            initTabs();
+            initToast();
+            initAutosaveBanner();
+
+            addCharacterField("Selection");
+            updateTalkerRadios();
+            renderIconPicker();
+            loadCharacterIcons();
+            renderMessages();
+
+            const editor = editorEl();
+            editor.addEventListener("paste", (e) => {
+                // Paste as plain text so external styling cannot break the layout
+                e.preventDefault();
+                const text = (e.clipboardData || window.clipboardData).getData("text/plain");
+                document.execCommand("insertText", false, text);
+            });
+
+            // Submit on Enter (Shift+Enter for a line break)
+            editor.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    submitMessage();
+                }
+            });
+
+            document.addEventListener("selectionchange", saveEditorSelection);
+
+            document.getElementById("eventImagePreview").addEventListener("load", scheduleAutosave);
+        }
+
+        init();
+    </script>
+</body>
+</html>
