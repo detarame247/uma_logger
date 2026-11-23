@@ -790,7 +790,7 @@
         const SAVE_VERSION = 2;
 
         const CHARACTER_ICONS_DIR = "character_icons/";
-        // Full-character event art. Only the upper half is used for the event icon.
+        // Full-character event art. Only the upper two thirds are used for the event icon.
         const CHARACTER_EVENT_ICONS_DIR = "character_event_icons/";
 
         // Fallback list for the Character Event picker, used when
@@ -1351,25 +1351,25 @@
 
         const scheduleEventIconSearch = debounce(() => renderEventIconPicker(), 150);
 
-        // The event art is a full character, so keep only the upper half: a square
-        // crop centred inside the top half. The square frame is filled without
+        // The event art is a full character, so keep only the upper two thirds: a
+        // square crop centred inside that area. The square frame is filled without
         // squashing her, and the gold border is untouched.
-        function cropEventIconTopHalf(src) {
+        function cropEventIconTopTwoThirds(src) {
             return new Promise((resolve) => {
                 const img = new Image();
                 img.onload = () => {
                     try {
                         const w = img.naturalWidth || img.width;
                         const h = img.naturalHeight || img.height;
-                        const halfHeight = Math.max(1, Math.floor(h / 2));
-                        const side = Math.min(w, halfHeight);
+                        const cropHeight = Math.max(1, Math.floor((h * 2) / 3));
+                        const side = Math.min(w, cropHeight);
                         const sx = Math.max(0, (w - side) / 2);
                         const canvas = document.createElement("canvas");
                         canvas.width = Math.max(1, Math.round(side));
                         canvas.height = canvas.width;
                         const ctx = canvas.getContext("2d");
                         ctx.imageSmoothingQuality = "high";
-                        ctx.drawImage(img, sx, 0, side, halfHeight, 0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, sx, 0, side, side, 0, 0, canvas.width, canvas.height);
                         resolve(canvas.toDataURL("image/png"));
                     } catch (err) {
                         // Local file:// opens taint the canvas: show the whole art instead
@@ -1391,7 +1391,7 @@
 
         async function applyEventCharacterIcon(file) {
             const requestId = ++eventIconRequest;
-            const cropped = await cropEventIconTopHalf(CHARACTER_EVENT_ICONS_DIR + file);
+            const cropped = await cropEventIconTopTwoThirds(CHARACTER_EVENT_ICONS_DIR + file);
             if (requestId !== eventIconRequest) return; // a newer pick won
 
             setEventImage(cropped, file);
